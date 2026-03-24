@@ -1040,10 +1040,11 @@ export default function App() {
               <div className="w-full max-w-[280px] p-3 bg-zinc-900/30 rounded-xl border border-zinc-800/30 mx-auto">
                 <label className="block text-[9px] font-bold text-zinc-600 uppercase tracking-[0.2em] mb-2 text-center">Album Activ</label>
                 <div className="relative">
-                  <select 
+                  <select
                     value={settings.current_album_id}
                     onChange={(e) => updateSetting('current_album_id', e.target.value)}
-                    className="w-full bg-transparent text-sm font-medium focus:outline-none appearance-none cursor-pointer text-center text-zinc-300"
+                    className="w-full bg-transparent text-sm font-medium focus:outline-none appearance-none cursor-pointer text-zinc-300"
+                    style={{ textAlign: 'center', textAlignLast: 'center' }}
                   >
                     <option value="all" className="bg-zinc-900 font-bold text-emerald-500">✨ Toate albumele</option>
                     {albums.filter(a => a.id !== -1).map(a => (
