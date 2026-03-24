@@ -79,6 +79,18 @@ cd ~/Pi-Frame-Pro
 NODE_ENV=production pm2 start npm --name "rama-foto" -- start
 pm2 save
 ```
+apoi
+```cd ~/Pi-Frame-Pro
+git pull
+npm run build
+pm2 stop rama-foto
+pm2 delete rama-foto
+NODE_ENV=production pm2 start npm --name "rama-foto" -- start
+pm2 save
+```
+`sudo apt install xdotool`
+
+
 
 
 
