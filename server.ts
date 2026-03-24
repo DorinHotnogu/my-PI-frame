@@ -644,20 +644,17 @@ function updateLeds() {
 
 app.post('/api/system/:command', (req, res) => {
   const { command } = req.params;
-  console.log(`System Command: ${command}`);
+  console.log(`[System] Command: ${command}`);
   
   let shellCmd = '';
   switch (command) {
     case 'screen_on':
       shellCmd = getDisplayCommands('on');
-      updateLeds(); // Restore LEDs when screen turns on
       break;
     case 'screen_off':
       shellCmd = getDisplayCommands('off');
-      setLedsOff(); // Turn off LEDs when screen turns off
       break;
     case 'restart_display':
-      // Force client reload by updating refresh_token
       db.prepare("UPDATE settings SET value = ? WHERE key = 'refresh_token'").run(Date.now().toString());
       res.json({ success: true, message: 'Refresh signal sent to frame' });
       return;
@@ -669,11 +666,29 @@ app.post('/api/system/:command', (req, res) => {
   }
 
   if (process.env.NODE_ENV === 'production') {
+    if (command === 'screen_off') {
+      saveAndTurnOffLeds();
+    }
+
     exec(shellCmd, (err, stdout, stderr) => {
-      if (err) return res.status(500).json({ error: err.message });
+      if (err) {
+        console.error(`[System] Error: ${err.message}`);
+        return res.status(500).json({ error: err.message });
+      }
+
+      if (command === 'screen_on') {
+        setTimeout(() => restoreLeds(), 1000);
+      }
+
       res.json({ success: true, stdout });
     });
   } else {
+    if (command === 'screen_off') {
+      saveAndTurnOffLeds();
+    } else if (command === 'screen_on') {
+      restoreLeds();
+    }
+    console.log(`[System] Simulated: ${shellCmd}`);
     res.json({ success: true, message: `Simulated: ${shellCmd}` });
   }
 });
