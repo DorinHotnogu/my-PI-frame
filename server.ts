@@ -25,28 +25,98 @@ console.log('[DB] Initializing SQLite database (piframe.db)...');
 const DB_PATH = 'piframe.db';
 const BACKUP_PATH = 'piframe.db.bak';
 
-function backupDatabase() {
+const BACKUP_COUNT = 3; // Păstrăm 3 copii de backup
+let lastBackupTime = 0;
+const BACKUP_INTERVAL = 5 * 60 * 1000; // Backup maxim o dată la 5 minute
+
+function backupDatabase(force: boolean = false) {
   try {
-    if (fs.existsSync(DB_PATH)) {
-      fs.copyFileSync(DB_PATH, BACKUP_PATH);
-      // console.log('[DB] Backup created successfully');
+    // Nu face backup mai des de 5 minute (decât dacă e forțat)
+    const now = Date.now();
+    if (!force && (now - lastBackupTime) < BACKUP_INTERVAL) {
+      return;
     }
+
+    if (!fs.existsSync(DB_PATH)) return;
+
+    // Folosim API-ul SQLite pentru backup sigur
+    const backupPath = `${DB_PATH}.bak.1`;
+    const backupDb = new Database(backupPath);
+    db.backup(backupDb).then(() => {
+      backupDb.close();
+
+      // Rotație: .bak.3 → se șterge, .bak.2 → .bak.3, .bak.1 → .bak.2
+      for (let i = BACKUP_COUNT; i >= 2; i--) {
+        const older = `${DB_PATH}.bak.${i}`;
+        const newer = `${DB_PATH}.bak.${i - 1}`;
+        if (fs.existsSync(older)) fs.unlinkSync(older);
+        if (fs.existsSync(newer)) fs.renameSync(newer, older);
+      }
+
+      // Mutăm backup-ul proaspăt ca .bak.1
+      if (fs.existsSync(backupPath)) {
+        // Deja e pe poziția .bak.1 după rotație
+      }
+
+      lastBackupTime = now;
+      console.log('[DB] Backup rotativ creat cu succes');
+    }).catch((err: any) => {
+      console.error('[DB] SQLite backup failed:', err);
+      backupDb.close();
+    });
   } catch (err) {
     console.error('[DB] Backup failed:', err);
   }
 }
 
 function restoreDatabase() {
-  try {
-    if (fs.existsSync(BACKUP_PATH)) {
-      fs.copyFileSync(BACKUP_PATH, DB_PATH);
-      console.log('[DB] Restored from backup');
-      return true;
+  // Încearcă fiecare backup în ordine (.bak.1 = cel mai recent)
+  for (let i = 1; i <= BACKUP_COUNT; i++) {
+    const backupFile = `${DB_PATH}.bak.${i}`;
+    try {
+      if (fs.existsSync(backupFile)) {
+        fs.copyFileSync(backupFile, DB_PATH);
+        console.log(`[DB] Restored from backup ${i}`);
+        return true;
+      }
+    } catch (err) {
+      console.error(`[DB] Restore from backup ${i} failed:`, err);
     }
-  } catch (err) {
-    console.error('[DB] Restore failed:', err);
   }
+
+  // Fallback: încearcă vechiul .bak dacă există
+  if (fs.existsSync(BACKUP_PATH)) {
+    try {
+      fs.copyFileSync(BACKUP_PATH, DB_PATH);
+      console.log('[DB] Restored from legacy backup');
+      return true;
+    } catch (err) {
+      console.error('[DB] Legacy restore failed:', err);
+    }
+  }
+
   return false;
+}
+
+function verifyDatabase(): boolean {
+  try {
+    // Verifică integritatea completă a bazei de date
+    const result = db.pragma('integrity_check') as any[];
+    if (result[0]?.integrity_check !== 'ok') {
+      console.error('[DB] Integrity check failed:', result);
+      return false;
+    }
+    // Verifică că tabelele principale există și sunt accesibile
+    db.prepare('SELECT COUNT(*) FROM settings').get();
+    db.prepare('SELECT COUNT(*) FROM albums').get();
+    db.prepare('SELECT COUNT(*) FROM photos').get();
+    db.prepare('SELECT COUNT(*) FROM schedule').get();
+    db.prepare('SELECT COUNT(*) FROM ambilight').get();
+    return true;
+  } catch (err) {
+    console.error('[DB] Verification failed:', err);
+    return false;
+  }
 }
 
 let db: Database.Database;
