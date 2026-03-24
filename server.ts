@@ -553,13 +553,10 @@ app.post('/api/photos/:id/copy', (req, res) => {
 
 // System Tools
 function getDisplayCommands(state: 'on' | 'off') {
-  const USB_HUB = "1-1";
-  const USB_PORT = "2";
-
   if (state === 'on') {
-    return `sudo -n /usr/sbin/uhubctl -l ${USB_HUB} -p ${USB_PORT} -a on`;
+    return 'DISPLAY=:0 xrandr --output HDMI-1 --auto';
   } else {
-    return `sudo -n /usr/sbin/uhubctl -l ${USB_HUB} -p ${USB_PORT} -a off`;
+    return 'DISPLAY=:0 xrandr --output HDMI-1 --off';
   }
 }
 
