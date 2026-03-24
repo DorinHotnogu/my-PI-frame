@@ -72,23 +72,17 @@ chromium-browser --noerrdialogs --disable-infobars --kiosk https://localhost:300
 
 ## 9. De rulat acasa
 
-```
-pm2 stop rama-foto
-pm2 delete rama-foto
-cd ~/Pi-Frame-Pro
-NODE_ENV=production pm2 start npm --name "rama-foto" -- start
-pm2 save
-```
-apoi
-```cd ~/Pi-Frame-Pro
-git pull
-npm run build
-pm2 stop rama-foto
-pm2 delete rama-foto
-NODE_ENV=production pm2 start npm --name "rama-foto" -- start
-pm2 save
-```
-`sudo apt install xdotool`
+1. `sudo apt install xdotool`
+2. `cd ~/Pi-Frame-Pro`
+3. `git pull`
+4. `npm run build`
+5. `pm2 stop rama-foto`
+6. `pm2 delete rama-foto`
+7. `NODE_ENV=production pm2 start npm --name "rama-foto" -- start`
+8. `pm2 save`
+9. Editezi autostart cu FileZilla
+10. `sudo reboot`
+
 ## Fisierul din /pi/.config/openbox
 
 ```xset -dpms
