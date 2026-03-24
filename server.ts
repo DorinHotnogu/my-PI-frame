@@ -660,6 +660,10 @@ app.post('/api/system/:command', (req, res) => {
       break;
     case 'restart_display':
       db.prepare("UPDATE settings SET value = ? WHERE key = 'refresh_token'").run(Date.now().toString());
+      // Forțează reload Chromium pe Pi
+      exec('DISPLAY=:0 xdotool key F5', (err) => {
+        if (err) console.error('[System] Refresh failed:', err.message);
+      });
       res.json({ success: true, message: 'Refresh signal sent to frame' });
       return;
     case 'reboot':
