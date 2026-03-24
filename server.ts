@@ -194,6 +194,12 @@ app.get('/ping', (req, res) => {
 let ws281x: any = null;
 let ledsInitialized = false;
 let ledProcess: any = null;
+let ledStateBeforeScreenOff: {
+  enabled: string;
+  mode: string;
+  brightness: string;
+  static_color: string;
+} | null = null;
 
 async function initLeds() {
   if (ledsInitialized) return;
@@ -562,19 +568,46 @@ function getDisplayCommands(state: 'on' | 'off') {
 
 function setLedsOff() {
   try {
-    if (ws281x) {
-      if (ledsInitialized && ws281x.reset) {
-        ws281x.reset();
-      } else {
-        // Direct fallback if not initialized
-        if (process.env.NODE_ENV === 'production') {
-          exec(`sudo python3 led_control.py --mode off`);
-        }
+    if (ws281x && ledsInitialized) {
+      const settings = getAmbilightSettings();
+      const top = parseInt(settings.leds_top) || 0;
+      const right = parseInt(settings.leds_right) || 0;
+      const bottom = parseInt(settings.leds_bottom) || 0;
+      const left = parseInt(settings.leds_left) || 0;
+      const totalLeds = top + right + bottom + left;
+      if (totalLeds > 0) {
+        ws281x.render(new Uint32Array(totalLeds));
       }
+    } else {
+      exec(`sudo python3 led_control.py --mode off`, (err) => {
+        if (err) console.error("LED off failed:", err.message);
+      });
     }
   } catch (err) {
     console.error("Error setting LEDs off:", err);
   }
+}
+
+function saveAndTurnOffLeds() {
+  const settings = getAmbilightSettings();
+  ledStateBeforeScreenOff = {
+    enabled: settings.enabled,
+    mode: settings.mode,
+    brightness: settings.brightness,
+    static_color: settings.static_color
+  };
+  console.log('[LEDs] Stare salvata inainte de screen off:', ledStateBeforeScreenOff);
+  setLedsOff();
+}
+
+function restoreLeds() {
+  if (ledStateBeforeScreenOff && ledStateBeforeScreenOff.enabled === '1') {
+    console.log('[LEDs] Restaurare stare anterioara:', ledStateBeforeScreenOff);
+    updateLeds();
+  } else {
+    console.log('[LEDs] LED-urile erau oprite inainte de screen off, raman oprite.');
+  }
+  ledStateBeforeScreenOff = null;
 }
 
 function updateLeds() {
