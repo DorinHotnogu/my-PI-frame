@@ -71,8 +71,8 @@ chromium-browser --noerrdialogs --disable-infobars --kiosk https://localhost:300
 ## 7. Orientare Portret
 
 ## 9. De rulat acasa
-'''
-pm2 stop rama-foto
+
+'''pm2 stop rama-foto
 pm2 delete rama-foto
 cd ~/Pi-Frame-Pro
 NODE_ENV=production pm2 start npm --name "rama-foto" -- start
