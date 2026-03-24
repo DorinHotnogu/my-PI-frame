@@ -31,43 +31,30 @@ const BACKUP_INTERVAL = 5 * 60 * 1000; // Backup maxim o dată la 5 minute
 
 function backupDatabase(force: boolean = false) {
   try {
-    // Nu face backup mai des de 5 minute (decât dacă e forțat)
     const now = Date.now();
     if (!force && (now - lastBackupTime) < BACKUP_INTERVAL) {
       return;
     }
-
     if (!fs.existsSync(DB_PATH)) return;
 
-    // Folosim API-ul SQLite pentru backup sigur
-    const backupPath = `${DB_PATH}.bak.1`;
-    const backupDb = new Database(backupPath);
-    db.backup(backupDb).then(() => {
-      backupDb.close();
+    // Intai rotatie: .bak.2 devine .bak.3, .bak.1 devine .bak.2
+    for (let i = BACKUP_COUNT; i >= 2; i--) {
+      const older = `${DB_PATH}.bak.${i}`;
+      const newer = `${DB_PATH}.bak.${i - 1}`;
+      if (fs.existsSync(older)) fs.unlinkSync(older);
+      if (fs.existsSync(newer)) fs.renameSync(newer, older);
+    }
 
-      // Rotație: .bak.3 → se șterge, .bak.2 → .bak.3, .bak.1 → .bak.2
-      for (let i = BACKUP_COUNT; i >= 2; i--) {
-        const older = `${DB_PATH}.bak.${i}`;
-        const newer = `${DB_PATH}.bak.${i - 1}`;
-        if (fs.existsSync(older)) fs.unlinkSync(older);
-        if (fs.existsSync(newer)) fs.renameSync(newer, older);
-      }
+    // Apoi copie noua ca .bak.1
+    fs.copyFileSync(DB_PATH, `${DB_PATH}.bak.1`);
 
-      // Mutăm backup-ul proaspăt ca .bak.1
-      if (fs.existsSync(backupPath)) {
-        // Deja e pe poziția .bak.1 după rotație
-      }
-
-      lastBackupTime = now;
-      console.log('[DB] Backup rotativ creat cu succes');
-    }).catch((err: any) => {
-      console.error('[DB] SQLite backup failed:', err);
-      backupDb.close();
-    });
+    lastBackupTime = now;
+    console.log('[DB] Backup rotativ creat cu succes');
   } catch (err) {
     console.error('[DB] Backup failed:', err);
   }
 }
+
 
 function restoreDatabase() {
   // Încearcă fiecare backup în ordine (.bak.1 = cel mai recent)
@@ -122,10 +109,7 @@ function verifyDatabase(): boolean {
 let db: Database.Database;
 try {
   db = new Database(DB_PATH);
-  // Test if it's actually working
   db.prepare('SELECT 1').get();
-  // If we got here, it's working, so create a backup
-  backupDatabase();
 } catch (err: any) {
   if (err.code === 'SQLITE_CORRUPT') {
     console.error('[DB] Database is corrupt! Attempting restore...');
@@ -219,6 +203,18 @@ const defaultSettings = [
 
 const insertSetting = db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)');
 defaultSettings.forEach(s => insertSetting.run(s[0], s[1]));
+
+// Verificare completa a bazei de date la pornire
+if (verifyDatabase()) {
+  console.log('[DB] Database integrity check passed');
+  backupDatabase(true);
+} else {
+  console.error('[DB] Database integrity check FAILED - attempting restore');
+  db.close();
+  if (restoreDatabase()) {
+    db = new Database(DB_PATH);
+  }
+}
 
 // Default Album
 const albumsCount = db.prepare('SELECT COUNT(*) as count FROM albums').get() as any;
