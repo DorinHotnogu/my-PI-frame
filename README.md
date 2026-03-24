@@ -89,7 +89,24 @@ NODE_ENV=production pm2 start npm --name "rama-foto" -- start
 pm2 save
 ```
 `sudo apt install xdotool`
+## Fisierul din /pi/.config/openbox
 
+```xset -dpms
+xset s off
+xset s noblank
+unclutter -idle 0.1 -root &
+
+# Așteaptă ca serverul să pornească
+sleep 15
+
+chromium \
+  --kiosk \
+  --incognito \
+  --disable-infobars \
+  --no-first-run \
+  --disable-session-crashed-bubble \
+  --check-for-update-interval=31536000 \
+  http://127.0.0.1:3000/#slideshow```
 
 
 
