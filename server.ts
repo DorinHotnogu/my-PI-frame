@@ -557,7 +557,6 @@ app.post('/api/upload', upload.array('photos'), async (req, res) => {
   const processedFiles = [];
 
   for (const file of files) {
-      for (const file of files) {
     // Fix extensie dubla: scoatem extensia veche inainte de a adauga .jpg
     const nameWithoutExt = file.filename.replace(/\.[^/.]+$/, '');
     const outputFilename = `processed-${nameWithoutExt}.jpg`;
