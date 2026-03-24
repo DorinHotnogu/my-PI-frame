@@ -731,24 +731,32 @@ export default function App() {
     setView('album-detail');
   };
 
+  const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0 });
+
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || !selectedAlbum) return;
+    const fileList = Array.from(e.target.files);
     setUploading(true);
-    const formData = new FormData();
-    formData.append('album_id', selectedAlbum.id.toString());
-    for (let i = 0; i < e.target.files.length; i++) {
-      formData.append('photos', e.target.files[i]);
+    setUploadProgress({ current: 0, total: fileList.length });
+
+    for (let i = 0; i < fileList.length; i++) {
+      try {
+        const formData = new FormData();
+        formData.append('album_id', selectedAlbum.id.toString());
+        formData.append('photos', fileList[i]);
+        await fetch('/api/upload', {
+          method: 'POST',
+          body: formData
+        });
+      } catch (err) {
+        console.error(`Failed to upload ${fileList[i].name}:`, err);
+      }
+      setUploadProgress({ current: i + 1, total: fileList.length });
     }
 
-    try {
-      await fetch('/api/upload', {
-        method: 'POST',
-        body: formData
-      });
-      handleAlbumSelect(selectedAlbum); // Refresh
-    } finally {
-      setUploading(false);
-    }
+    handleAlbumSelect(selectedAlbum);
+    setUploading(false);
+    setUploadProgress({ current: 0, total: 0 });
   };
 
   const deletePhoto = async (id: number | string) => {
@@ -1160,7 +1168,7 @@ export default function App() {
                   selectedAlbum?.id !== -1 ? (
                     <label className="w-full bg-emerald-500 text-black font-bold py-4 rounded-2xl flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98] transition-all shadow-lg shadow-emerald-500/20">
                       <Upload size={22} />
-                      {uploading ? 'Se încarcă...' : 'Adaugă Fotografii'}
+                      {uploading ? `Se încarcă... ${uploadProgress.current}/${uploadProgress.total}` : 'Adaugă Fotografii'}
                       <input type="file" multiple accept="image/*" className="hidden" onChange={handleUpload} disabled={uploading} />
                     </label>
                   ) : (
