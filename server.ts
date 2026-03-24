@@ -238,7 +238,13 @@ const storage = multer.diskStorage({
     cb(null, Date.now() + '-' + file.originalname);
   }
 });
-const upload = multer({ storage });
+const upload = multer({
+  storage,
+  limits: {
+    fileSize: 20 * 1024 * 1024, // Max 20MB per fisier
+    files: 50 // Max 50 fisiere per request
+  }
+});
 
 app.use(cors());
 app.use(express.json());
@@ -556,38 +562,44 @@ app.post('/api/upload', upload.array('photos'), async (req, res) => {
   
   const processedFiles = [];
 
-  for (const file of files) {
-    // Fix extensie dubla: scoatem extensia veche inainte de a adauga .jpg
-    const nameWithoutExt = file.filename.replace(/\.[^/.]+$/, '');
-    const outputFilename = `processed-${nameWithoutExt}.jpg`;
-    const outputPath = path.join(PROCESSED_DIR, outputFilename);
-
-    // Image Processing: 9:16 Portrait
-    // Target: 1080x1920 (standard HD portrait)
-    await sharp(file.path)
-      .resize({
-        width: 1080,
-        height: 1920,
-        fit: 'cover',
-        position: 'center'
-      })
-      .jpeg({ quality: 90 })
-      .toFile(outputPath);
-
-    // Sterge fisierul original dupa procesare
+    for (const file of files) {
     try {
-      fs.unlinkSync(file.path);
-    } catch (e) {
-      console.error(`Failed to delete original: ${file.path}`, e);
-    }
+      // Fix extensie dubla: scoatem extensia veche inainte de a adauga .jpg
+      const nameWithoutExt = file.filename.replace(/\.[^/.]+$/, '');
+      const outputFilename = `processed-${nameWithoutExt}.jpg`;
+      const outputPath = path.join(PROCESSED_DIR, outputFilename);
 
-    const result = db.prepare('INSERT INTO photos (album_id, filename, original_name) VALUES (?, ?, ?)')
-      .run(album_id, outputFilename, file.originalname);
-    
-    processedFiles.push({ id: result.lastInsertRowid, filename: outputFilename });
+      // Image Processing: 9:16 Portrait
+      // Target: 1080x1920 (standard HD portrait)
+      await sharp(file.path)
+        .resize({
+          width: 1080,
+          height: 1920,
+          fit: 'cover',
+          position: 'center'
+        })
+        .jpeg({ quality: 90 })
+        .toFile(outputPath);
+
+      // Sterge fisierul original dupa procesare
+      try {
+        fs.unlinkSync(file.path);
+      } catch (e) {
+        console.error(`Failed to delete original: ${file.path}`, e);
+      }
+
+      const result = db.prepare('INSERT INTO photos (album_id, filename, original_name) VALUES (?, ?, ?)')
+        .run(album_id, outputFilename, file.originalname);
+
+      processedFiles.push({ id: result.lastInsertRowid, filename: outputFilename });
+    } catch (err) {
+      console.error(`Failed to process ${file.originalname}:`, err);
+      // Sterge fisierul original daca procesarea a esuat
+      try { fs.unlinkSync(file.path); } catch (e) {}
+      // Continua cu urmatorul fisier
+    }
   }
   backupDatabase();
-
   res.json(processedFiles);
 });
 
