@@ -557,21 +557,30 @@ app.post('/api/upload', upload.array('photos'), async (req, res) => {
   const processedFiles = [];
 
   for (const file of files) {
-    const outputFilename = `processed-${file.filename}.jpg`;
+      for (const file of files) {
+    // Fix extensie dubla: scoatem extensia veche inainte de a adauga .jpg
+    const nameWithoutExt = file.filename.replace(/\.[^/.]+$/, '');
+    const outputFilename = `processed-${nameWithoutExt}.jpg`;
     const outputPath = path.join(PROCESSED_DIR, outputFilename);
 
     // Image Processing: 9:16 Portrait
     // Target: 1080x1920 (standard HD portrait)
-    // Fit to height, crop sides if necessary to fill
     await sharp(file.path)
       .resize({
         width: 1080,
         height: 1920,
-        fit: 'cover', // This ensures it fills the 9:16 area, cropping if needed
+        fit: 'cover',
         position: 'center'
       })
       .jpeg({ quality: 90 })
       .toFile(outputPath);
+
+    // Sterge fisierul original dupa procesare
+    try {
+      fs.unlinkSync(file.path);
+    } catch (e) {
+      console.error(`Failed to delete original: ${file.path}`, e);
+    }
 
     const result = db.prepare('INSERT INTO photos (album_id, filename, original_name) VALUES (?, ?, ?)')
       .run(album_id, outputFilename, file.originalname);
