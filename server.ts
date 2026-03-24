@@ -307,18 +307,18 @@ async function initLeds() {
         const bottom = parseInt(settings.leds_bottom) || 0;
         const left = parseInt(settings.leds_left) || 0;
         const totalLeds = top + right + bottom + left;
+        const brightness = parseInt(settings.brightness) || 128;
 
         if (settings.mode === 'static') {
           const colorHex = settings.static_color || '#ffffff';
-          const brightness = parseInt(settings.brightness) || 128;
-          console.log(`Fallback: Setting static color ${colorHex} for ${totalLeds} LEDs`);
           exec(`sudo python3 led_control.py --mode static --color "${colorHex}" --brightness ${brightness} --count ${totalLeds}`, (err) => {
-            if (err) console.error("Mock LED fallback failed:", err.message);
+            if (err) console.error("LED static failed:", err.message);
           });
         } else {
-          // For dynamic mode in mock, we just turn them off or do nothing
-          // because calling python script for every frame is too slow.
-          // But we can at least ensure they are off if not in static mode and real lib fails.
+          const colorsJson = JSON.stringify(Array.from(data));
+          exec(`sudo python3 led_control.py --mode ambilight --colors '${colorsJson}' --brightness ${brightness} --count ${totalLeds}`, (err) => {
+            if (err) console.error("LED ambilight failed:", err.message);
+          });
         }
       },
       reset: () => {
