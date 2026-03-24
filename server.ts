@@ -645,6 +645,10 @@ function updateLeds() {
 app.post('/api/system/:command', (req, res) => {
   const { command } = req.params;
   console.log(`[System] Command: ${command}`);
+
+  if (command === 'screen_on' || command === 'screen_off') {
+    manualOverride = true;
+  }
   
   let shellCmd = '';
   switch (command) {
@@ -940,6 +944,8 @@ app.post('/api/slideshow/prev', (req, res) => {
 
 // Schedule Enforcer
 let lastScheduleState: 'on' | 'off' | null = null;
+let manualOverride: boolean = false;
+let lastScheduleWindow: boolean | null = null;
 
 setInterval(() => {
   const now = new Date();
@@ -950,40 +956,52 @@ setInterval(() => {
   const schedule = db.prepare('SELECT * FROM schedule WHERE day_type = ?').get(dayType) as any;
   
   if (schedule && schedule.enabled) {
-    // Use exclusive end time for better behavior (e.g. 22:00 means it turns off at 22:00)
     const isWithinWindow = currentTime >= schedule.start_time && currentTime < schedule.end_time;
+
+    // Detectăm momentul exact de tranziție (pragul)
+    const windowChanged = lastScheduleWindow !== null && isWithinWindow !== lastScheduleWindow;
+    lastScheduleWindow = isWithinWindow;
+
+    // Dacă am detectat o tranziție, resetăm override-ul manual
+    if (windowChanged) {
+      manualOverride = false;
+    }
+
+    // Dacă utilizatorul a dat comandă manuală, nu facem nimic
+    if (manualOverride) return;
+
     const newState = isWithinWindow ? 'on' : 'off';
-    
-    // Only execute if state changed to avoid redundant shell calls
+
     if (newState !== lastScheduleState) {
-      console.log(`[Schedule] Transitioning to ${newState} (Day: ${dayType}, Time: ${currentTime})`);
+      console.log(`[Schedule] ${dayType} ${currentTime} -> ${newState}`);
+
+      if (newState === 'off') {
+        saveAndTurnOffLeds();
+      }
+
       const shellCmd = getDisplayCommands(newState);
-      
+
       if (process.env.NODE_ENV === 'production') {
         exec(shellCmd, (err) => {
           if (!err) {
             lastScheduleState = newState;
             if (newState === 'on') {
-              updateLeds();
-            } else {
-              setLedsOff();
+              setTimeout(() => restoreLeds(), 1000);
             }
           } else {
-            console.error(`[Schedule] Error executing command: ${err.message}`);
+            console.error(`[Schedule] Error: ${err.message}`);
           }
         });
       } else {
-        console.log(`[Schedule] ${dayType} ${currentTime} -> ${newState} (Simulated: ${shellCmd})`);
+        console.log(`[Schedule] Simulated: ${shellCmd}`);
         lastScheduleState = newState;
         if (newState === 'on') {
-          updateLeds();
-        } else {
-          setLedsOff();
+          restoreLeds();
         }
       }
     }
   }
-}, 30000); // Check every 30 seconds for better responsiveness
+}, 30000);
 
 async function startServer() {
   try {
