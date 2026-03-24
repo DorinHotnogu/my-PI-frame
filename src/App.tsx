@@ -1046,8 +1046,8 @@ export default function App() {
                     className="w-full bg-transparent text-sm font-medium focus:outline-none appearance-none cursor-pointer text-center text-zinc-300"
                   >
                     <option value="all" className="bg-zinc-900 font-bold text-emerald-500">✨ Toate albumele</option>
-                    {albums.map(a => (
-                      <option key={a.id} value={a.id} className="bg-zinc-900">{a.name}</option>
+                    {albums.filter(a => a.id !== -1).map(a => (
+                        <option key={a.id} value={a.id} className="bg-zinc-900">{a.name}</option>
                     ))}
                   </select>
                 </div>
